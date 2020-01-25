@@ -1,8 +1,16 @@
 import numpy as np
+import pickle
 import random
 import networkx as nx
 import matplotlib.pyplot as plt
 from networkx.drawing.nx_agraph import graphviz_layout
+
+class Player():
+    """
+    A generic player
+    """
+    def __init__(self, marker):
+        self.marker = marker
 
 
 class RandomPlayer():
@@ -16,183 +24,110 @@ class RandomPlayer():
         moves_available = board.moves_available(board.state)
         move = random.choice(moves_available)
         return move
-    
 
-class MiniMaxPlayer():
-    """
-    A player that searches all possible moves on the board
-    up to search_depth, then uses the minimax algorithm to
-    determine the best move to play.
-    """
 
-    def __init__(self, marker, search_depth=3):
+class HumanPlayer():
+    """
+    A human player
+    """
+    def __init__(self, marker):
         self.marker = marker
-        self.search_depth = search_depth
         
     def move(self, board):
         """Move selection"""
-        G = self.search(board=board, player=self, max_depth=self.search_depth)
-        move = self.minimax(G)
+        board.draw(board.state)
+        row = input(prompt='0,1,2 :')
+        col = input(prompt='0,1,2 :')
+        move = (int(row), int(col))
         return move
-    
-    @staticmethod
-    def search(board, player, max_depth): # -> DiGraph
-        """
-        Run game simulations from current game state to a maximum number
-        of moves ahead (max_depth)
-        Return the graph of possible moves and outcomes
-        state = [(1,1), (1,1)]
-        Assume player is player to be maximized
-        """
-        player_marker = player.marker
-        opponent_marker = {'X': 'O', 'O': 'X'}.get(player.marker)
 
-        turn_marker = player.marker
+        
+class MiniMaxPlayer():
+    """
+    A minimax player
+    """
+    def __init__(self, marker, first_move=True):
+        self.marker = marker
+        if first_move:
+            with open('ttt_minimax_first_move_dict.pickle', 'rb') as f:
+                self.minimax = pickle.load(f)
+        else:
+            with open('ttt_minimax_second_move_dict.pickle', 'rb') as f:
+                self.minimax = pickle.load(f)            
+        
+    def move(self, board):
+        """Move selection"""
+        move = self.minimax[board.state.tostring()]
+        return move    
+
+
+def search(board, player_marker='X', max_depth=3, player_moves_first=True): # -> DiGraph
+    """
+    Run game simulations from current game state to a maximum number
+    of moves ahead (max_depth)
+    Return the graph of possible moves and outcomes
+    state = [(1,1), (1,1)]
+    Assume player is player to be maximized
+    """
+
+    opponent_marker = {'X': 'O', 'O': 'X'}.get(player_marker)
+
+    if player_moves_first:
+        turn_marker = player_marker
         non_turn_maker = opponent_marker
+    else:
+        turn_marker = opponent_marker
+        non_turn_maker = player_marker
 
-        depth = 0
-        n = 0 # node label which also serves as a node counter
+    depth = 0
+    n = 0 # node label which also serves as a node counter
 
-        G = nx.DiGraph()
-        G.add_node(0, finished=board.is_finished(board.state), player=turn_marker, state=board.state)
+    G = nx.DiGraph()
+    G.add_node(0, finished=board.is_finished(board.state), player=turn_marker, state=board.state)
 
-        # First branch in look ahead
-        newleavelist=[]
+    # First branch in look ahead
+    newleavelist=[]
 
-        for move in board.moves_available(state=board.state):   
-            # Do move   
-            new_state = board.play_move(state=board.state, move=move, marker=turn_marker)
-            # Check if game is finished after move
-            is_finished = board.is_finished(new_state)
+    for move in board.moves_available(state=board.state):   
+        # Do move   
+        new_state = board.play_move(state=board.state, move=move, marker=turn_marker)
+        # Check if game is finished after move
+        is_finished = board.is_finished(new_state)
 
-            # Add move node to graph
-            n=n+1
-            G.add_node(n, finished=is_finished, player=non_turn_maker, state=new_state)
-            G.add_edge(0, n, move=move)
-            if is_finished:
-                G.nodes[n]['result'] = {player_marker:'won', opponent_marker:'lost', 'draw':'draw'}.get(is_finished)
-                continue
-            newleavelist.append(n)
+        # Add move node to graph
+        n=n+1
+        G.add_node(n, finished=is_finished, player=non_turn_maker, state=new_state)
+        G.add_edge(0, n, move=move)
+        if is_finished:
+            G.nodes[n]['result'] = {player_marker:'won', opponent_marker:'lost', 'draw':'draw'}.get(is_finished)
+            continue
+        newleavelist.append(n)
 
-        depth+=1
-        # Subsequent branches
-        while depth < max_depth:
-            # switch turns
-            turn_marker, non_turn_maker = non_turn_maker, turn_marker
-            leavelist = newleavelist[:]
-            newleavelist = []
-            for leave in leavelist:
-                # Get parent state
-                parent_state = G.nodes(data=True)[leave]['state'] #G.nodes(data=True)[list(G.pred[leave])[0]]['state']
-                for move in board.moves_available(parent_state):
-                    # Do move   
-                    new_state = board.play_move(parent_state, move=move, marker=turn_marker)
-                    # Check if game is finished after move
-                    is_finished = board.is_finished(new_state)
-                    # Add move node to graph
-                    n=n+1
-                    G.add_node(n, finished=is_finished, player=non_turn_maker, state=new_state)
-                    G.add_edge(leave, n, move=move)
-                    if is_finished:
-                        G.nodes[n]['result'] = {player_marker: 'won', opponent_marker: 'lost', 'draw': 'draw'}.get(is_finished)
-                        continue  
-                    newleavelist.append(n)
-            depth=depth+1
-        return G
-
-    
-    @staticmethod
-    def minimax(G):
-        """
-        Perform minimax from node n on a NetworkX graph G.
-        Assume node n is a maximiser node.
-        Return best move
-        """
-        maxplayer = True
-        minplayer = False
-        # Recursive tree search
-        def _minimax(G, n, player):
-
-            # Base case, winning node found
-            if G.nodes[n]['finished']:
-                if G.nodes[n]['result'] == 'won':
-                    score = 100
-                elif G.nodes[n]['result'] == 'lost':
-                    score = -100
-                elif G.nodes[n]['result'] == 'draw':
-                    score = 0
-                else:
-                    assert True == False
-
-                G.nodes[n].update({'score': score})
-                return score
-
-            if player == maxplayer:
-                bestv = -1
-                for child in G.successors(n):
-                    v = _minimax(G, child, minplayer)
-                    G.nodes[child].update({'score': v})
-                    bestv = max(bestv, v)
-            else:
-                bestv = 1
-                for child in G.successors(n):
-                    v = _minimax(G, child, maxplayer)
-                    G.nodes[child].update({'score': v})
-                    bestv = min(bestv, v)
-            return bestv
-
-        # Find the best first move from the given node
-        # Assume given node n is a maximiser node.
-        best_node = None
-        bestv = -1
-
-        for child in G.successors(0):
-            v = _minimax(G, child, minplayer)
-            G.nodes[child].update({'score': v})
-
-            if v > bestv:
-                best_node = child
-                bestv = v
-
-        if best_node:
-            return G.pred[best_node][0]['move']
-
-        else:
-            scores = [(n[0], n[1]['score']) for n in G.subgraph(G.successors(0)).nodes(data=True)]
-            random.shuffle(scores)
-            best_node = max(scores, key = lambda t: t[1])[0]
-            return G.pred[best_node][0]['move']
-    
-    @staticmethod    
-    def draw_graph(G, fig_size = (5,5), node_label=None, edge_label=None):
-        """A utility method to draw a given graph"""
-        f, ax = plt.subplots(figsize=fig_size)
-        G.graph.setdefault('graph', {})['rankdir'] = 'LR'
-        # color nodes based on winner
-        node_color = []
-        node_size = 50
-        for node in G.nodes(data=True):
-            if node[1]['finished']:
-                if node[1]['result'] == 'won':
-                    node_color.append('green')
-                elif node[1]['result'] == 'lost':
-                    node_color.append('red')
-                elif node[1]['result'] == 'draw':
-                    node_color.append('yellow')
-                else:
-                    node_color.append('blue')
-            else:
-                node_color.append('lightgray')
-        pos = graphviz_layout(G, prog='dot')
-        if node_label:
-            nx.draw_networkx(G, pos=pos, labels=nx.get_node_attributes(G, node_label), node_color=node_color, node_size=node_size)
-        else:
-            nx.draw_networkx(G, pos=pos, with_labels=False, node_color=node_color, node_size=node_size)   
-        if edge_label:
-            nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=nx.get_edge_attributes(G, edge_label))
-        plt.show()
-        return
-    
+    depth+=1
+    # Subsequent branches
+    while depth < max_depth:
+        # switch turns
+        turn_marker, non_turn_maker = non_turn_maker, turn_marker
+        leavelist = newleavelist[:]
+        newleavelist = []
+        for leave in leavelist:
+            # Get parent state
+            parent_state = G.nodes(data=True)[leave]['state'] #G.nodes(data=True)[list(G.pred[leave])[0]]['state']
+            for move in board.moves_available(parent_state):
+                # Do move   
+                new_state = board.play_move(parent_state, move=move, marker=turn_marker)
+                # Check if game is finished after move
+                is_finished = board.is_finished(new_state)
+                # Add move node to graph
+                n=n+1
+                G.add_node(n, finished=is_finished, player=non_turn_maker, state=new_state)
+                G.add_edge(leave, n, move=move)
+                if is_finished:
+                    G.nodes[n]['result'] = {player_marker: 'won', opponent_marker: 'lost', 'draw': 'draw'}.get(is_finished)
+                    continue  
+                newleavelist.append(n)
+        depth=depth+1
+    return G
     
 
 class Board():
@@ -269,3 +204,92 @@ class Board():
         
         # game still in progress
         return None
+
+    
+
+def draw_graph(G, fig_size = (5,5), node_label=None, edge_label=None):
+    """A utility method to draw a given graph"""
+    f, ax = plt.subplots(figsize=fig_size)
+    G.graph.setdefault('graph', {})['rankdir'] = 'LR'
+    # color nodes based on winner
+    node_color = []
+    node_size = 50
+    for node in G.nodes(data=True):
+        if node[1]['finished']:
+            if node[1]['result'] == 'won':
+                node_color.append('green')
+            elif node[1]['result'] == 'lost':
+                node_color.append('red')
+            elif node[1]['result'] == 'draw':
+                node_color.append('yellow')
+            else:
+                node_color.append('blue')
+        else:
+            node_color.append('lightgray')
+    pos = graphviz_layout(G, prog='dot')
+    if node_label:
+        nx.draw_networkx(G, pos=pos, labels=nx.get_node_attributes(G, node_label), node_color=node_color, node_size=node_size)
+    else:
+        nx.draw_networkx(G, pos=pos, with_labels=False, node_color=node_color, node_size=node_size)   
+    if edge_label:
+        nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=nx.get_edge_attributes(G, edge_label))
+    plt.show()
+    return
+    
+
+    
+def minimax(Graph, first_move=True):
+    """
+    Perform minimax from node n on a NetworkX graph G.
+    Assume node n is a maximiser node.
+    Return best move
+    """
+    maxplayer = True
+    minplayer = False
+    G = Graph.copy()
+    G.nodes[0].update({'player': {True: 'max', False: 'min'}.get(first_move)})
+    # Recursive tree search
+    def _minimax(G, n, player):
+
+        # Base case, winning node found
+        if G.nodes[n]['finished']:
+            if G.nodes[n]['result'] == 'won':
+                score = 100
+            elif G.nodes[n]['result'] == 'lost':
+                score = -100
+            elif G.nodes[n]['result'] == 'draw':
+                score = 0
+            else:
+                assert True == False
+
+            G.nodes[n].update({'score': score})
+            return score
+        
+        if player == maxplayer:
+            bestv = -1
+            for child in G.successors(n):
+                v = _minimax(G, child, minplayer)
+                G.nodes[child].update({'score': v, 'player': 'min'})
+                bestv = max(bestv, v)
+        else:
+            bestv = 1
+            for child in G.successors(n):
+                v = _minimax(G, child, maxplayer)
+                G.nodes[child].update({'score': v, 'player': 'max'})
+                bestv = min(bestv, v)
+        return bestv
+
+    # Find the best first move from the given node
+    # Assume given node n is a maximiser node.
+    best_node = None
+    bestv = -1
+
+    for child in G.successors(0):
+        v = _minimax(G, child, {True: minplayer, False: maxplayer}.get(first_move))
+        G.nodes[child].update({'score': v, 'player': {True: 'min', False: 'max'}.get(first_move)})
+
+        if v > bestv:
+            best_node = child
+            bestv = v
+
+    return G
