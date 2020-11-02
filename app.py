@@ -1,24 +1,11 @@
 import datetime
 import json
-import os
 import logging
 import time
 
 from auth import gcloud_auth
 from flask import Flask, request, jsonify
 from pytz import timezone
-
-import pdb
-
-# curl \
-# --header "Authorization: Basic ZGF2aWQ6Y29va2llc2FuZGNyZWFt" \
-# -G http://localhost:8080/
-
-# curl \
-# --header "Authorization: Basic ZGF2aWQ6Y29va2llc2FuZGNyZWFt" \
-# -d '{"board": "----X----"}'
-# http://localhost:8080/
-
 
 app = Flask(__name__)
 logger = logging.getLogger('app')
@@ -53,20 +40,19 @@ def run():
         timezone('America/Toronto')).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
     data = request.get_json()
     board = data.get('board', False)
-
     if not board:
-        return 'board data not found in POST request', 500
-
-    print('board:', board)
-    move = ttt_moves[board]
-    print('move:', move)
+        return 'board data missing', 400
+    
+    move = ttt_moves.get(board)
+    if not move:
+        return 'board not found', 400
 
     end = time.time()
     execution_time = round(end - start, 2)
     logger.info(f"Success! Total execution time: {execution_time} sec.")
     logger.info(f"Move: {move}")
 
-    return jsonify({'board': board, 'move': move})
+    return jsonify({'board': board, 'move': move}), 200
 
 
 if __name__ == '__main__':
