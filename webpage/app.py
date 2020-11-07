@@ -79,29 +79,23 @@ def index():
     ## Computer turn
     # Check game
     checkGame(session['board'])
-    print('game:', session['game'])
     # Check if finished
     if session['game'] != 'in progress':
-        print('GAME FINISHED 1!!!')
         return render_template("game.html", board=session["board"], game=session["game"])
 
 
     board_string = boardToString(session["board"])
     move = ttt_moves.get(board_string)
     if not move:
-        print('move not found!')
         session.pop('board')
         return redirect(url_for("index"))
 
     row = (move-1) // 3
     col = (move-1) % 3
-    print("board:", board_string)
-    print("move:", row, col)
     session["board"][row][col] = "O"
 
     # Check game
     checkGame(session['board'])
-    print('game:', session['game'])
         
     return render_template("game.html", board=session["board"], game=session["game"])
 
