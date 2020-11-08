@@ -6,31 +6,47 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
         integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     <style>
-        table {
-            border-collapse: collapse;
-        }
-
-        td {
-            border: 1px solid black;
-            width: 150px;
-            height: 150px;
-            font-size: 30px;
+        h1 {
             text-align: center;
         }
 
-        td>a {
-            font-size: 18px;
+        .game-board {
+            width: 600px;
+            height: 600px;
+            margin: 0 auto;
+            background-color: #34495e;
+            color: #fff;
+            border: 6px solid #2c3e50;
+            border-radius: 10px;
+            display: grid;
+            grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+        }
+
+        .box {
+            border: 6px solid #2c3e50;
+            border-radius: 2px;
+            font-family: Helvetica;
+            font-weight: bold;
+            font-size: 4em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .box:hover {
+            background-color: yellow;
+        }
+
+        a.fill-div {
+            display: block;
+            height: 100%;
+            width: 100%;
+            text-decoration: none;
         }
     </style>
 </head>
 
 <body>
-
-    <div>
-        <a href="{{url_for('reset')}}" class="btn btn-default">Reset Game</a>
-
-    </div>
-
     {% if game == 'draw' %}
     <div>
         <h1>Draw!</h1>
@@ -46,21 +62,23 @@
         <h1>O wins!</h1>
     </div>
     {% endif %}
-    <table>
+    <div class="game-board">
         {% for i in range(3) %}
-        <tr>
-            {% for j in range(3) %}
-            <td>
-                {% if board[i][j] %}
-                {{ board[i][j] }}
-                {% else %}
-                <a href="{{ url_for('play', row=i, col=j) }}">Play here.</a>
-                {% endif %}
-            </td>
-            {% endfor %}
-        </tr>
+        {% for j in range(3) %}
+        {% if board[i][j] %}
+        <div class="box">{{ board[i][j] }}</div>
+        {% else %}
+        <div class="box">
+            <a href="{{ url_for('play', row=i, col=j) }}" class="fill-div"></a>
+        </div>
+        {% endif %}
         {% endfor %}
-    </table>
+        {% endfor %}
+    </div>
+    <div>
+        <h1><a href="{{url_for('reset')}}">Reset Game</a></h1>
+    </div>
+
 </body>
 
 </html>
