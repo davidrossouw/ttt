@@ -116,5 +116,5 @@ if __name__ == '__main__':
     # Used when running locally only. When deploying to Cloud Run,
     # a webserver process such as Gunicorn will serve the app.
     app.run(host='localhost', port=int(
-        os.environ.get('PORT', 8080)), debug=True, use_reloader=True)
+        os.environ.get('PORT', 8080)), debug=False, use_reloader=False)
 
